@@ -7,6 +7,10 @@ namespace Monado
     public class PlayerController : ControllerCore
     {
         public Particles myParticles;
+        [Header("Stat Information")]
+        public PlayerStatus ps;
+        public float run_cost;
+        public float wall_jump_cost;       
 
         public override void OnWallDragStart() {
             myParticles.wallSlideParticles.Play();            
@@ -39,11 +43,24 @@ namespace Monado
 
         public override void SyncLateUpdate()
         {
-            if (isGrounded && input.isRunning && !myParticles.runParticles.isPlaying && Mathf.Abs(input.xMovement) > groundMoveSpeed) myParticles.runParticles.Play();
+            if (isGrounded && input.isRunning && !myParticles.runParticles.isPlaying && Mathf.Abs(input.xMovement) > groundMoveSpeed && !isCrouch) myParticles.runParticles.Play();
             else if ((!input.isRunning || !isGrounded || Mathf.Abs(input.xMovement) <= groundMoveSpeed) && myParticles.runParticles.isPlaying) { myParticles.runParticles.Stop(); }
             if(!isGrounded && myParticles.skidParticles.isPlaying) myParticles.skidParticles.Stop();
         }
+
+        public override bool canWallJump() {
+            if (ps.stamina_cooldown) return false;
+            float t = ps.stamina - wall_jump_cost;
+            ps.stamina = t;
+            return true;
         }
 
+        public override bool canSprint() {
+            if (ps.stamina_cooldown) return false;
+            float t = ps.stamina - run_cost;
+            ps.stamina = t;
+            return true;
+        }
 
-    }
+        }
+}

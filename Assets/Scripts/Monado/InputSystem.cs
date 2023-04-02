@@ -14,6 +14,8 @@ namespace Monado
         public bool jumpHold;
         public bool jumpRelease;
         public bool isRunning;
+        public bool isCrouched;
+        public bool isDodge;
 
         public void Check()
         {
@@ -23,6 +25,8 @@ namespace Monado
             jumpHold = Input.GetButton("Jump");
             jumpRelease = Input.GetButtonUp("Jump");
             isRunning = Input.GetButton("Run");
+            isCrouched = Input.GetAxisRaw("Vertical") < 0;
+            isDodge = Input.GetButtonDown("Dodge");
         }
     }
 
