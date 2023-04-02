@@ -112373,7 +112373,7 @@ MonoBehaviour:
   jumpState: 0
   velocity: {x: 0, y: 0}
   groundMoveSpeed: 0.1
-  groundRunSpeed: 0.12
+  groundRunSpeed: 0.16
   crawlSpeed: 0.03
   airMoveSpeed: 0.008
   slopeCheckDistance: 0.75
@@ -112383,6 +112383,7 @@ MonoBehaviour:
   playerSkinWidth: 0.5
   pushUpDetectionSize: 0.9
   isGrounded: 1
+  doSprint: 0
   groundCheckDistance: 0.51
   groundLayerMask:
     serializedVersion: 2
@@ -112406,11 +112407,9 @@ MonoBehaviour:
   previousVelocityX: -0.00054279494
   sidePushSize: {x: 0, y: 0, z: 0}
   hasWalljumped: 0
-  backflipStrength: {x: -0.0002, y: 0.3}
-  initialFlipVelocity: 3
-  backflipIV: {x: 0, y: 0}
-  backflipGravityScalar: 0.1
-  backflipAngle: 78
+  backflipStrength: {x: 4, y: 19}
+  backflip_velocity: {x: 0, y: 0}
+  backflip_gravity: 45
   turnTime: 0.01
   isWallSliding: 0
   myParticles:
@@ -112513,6 +112512,8 @@ MonoBehaviour:
   green_stamina: {fileID: 21300000, guid: e0acc78960353674f95678023d868a9e, type: 3}
   red_stamina: {fileID: 21300000, guid: 4929adc181fe37c44b6a6f3354208c2d, type: 3}
   stamina_cooldown: 0
+  didChangeLastFrame: 0
+  timeToRegain: 0.6
   stamina_wheel: {fileID: 1845923660}
 --- !u!1 &1195863187
 GameObject:

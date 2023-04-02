@@ -21,6 +21,7 @@ namespace Monado
         public Animator anim;
 
         public JumpState jumpState = JumpState.Falling;
+
         [Header("Physics")]
         public Vector2 velocity;
         public float groundMoveSpeed = 1.0f;
@@ -34,6 +35,7 @@ namespace Monado
         public float playerSkinWidth = 0.45f;
         public float pushUpDetectionSize = 0.9f;
         public bool isGrounded = false;
+        public bool doSprint = false;
 
 
         [Header("Jumping and Gravity")]
@@ -71,6 +73,8 @@ namespace Monado
 
         [HideInInspector] public float previousVelocityX = 0f;
 
+        private PlayerStatus ps;
+
         // Called when the GameObject is enabled
         public void Awake()
         {
@@ -82,6 +86,7 @@ namespace Monado
         {
             input = GetComponent<InputSystem>();
             rb2d= GetComponent<Rigidbody2D>();
+            ps = GetComponent<PlayerStatus>();
             SetMainHitbox(collider_MAIN);
         }
 
@@ -129,7 +134,6 @@ namespace Monado
         public void Update()
         {
             isGrounded = doGrounded();
-            if (hasStartedFlip) UpdateHandleBackJump();
         }
 
         // Called third, handle any checking functions here
@@ -159,14 +163,18 @@ namespace Monado
         // Check if the controller is close enough to collide with the ground
         void CheckGroundedState()
         {
-            RaycastHit2D hitC = new RaycastHit2D(), hitL = new RaycastHit2D(), hitR = new RaycastHit2D();
-            bool isG = DetectCollisionAtDistance(getFeetPos() + (Vector2.up / 2), Vector2.down, groundCheckDistance, groundLayerMask, out hitC) ||
-                DetectCollisionAtDistance(getFeetPos() + (Vector2.up / 2) + Vector2.right * collider_MAIN.size.x/2, Vector2.down, groundCheckDistance, groundLayerMask, out hitL) ||
-                DetectCollisionAtDistance(getFeetPos() + (Vector2.up / 2) - Vector2.right * collider_MAIN.size.x/2, Vector2.down, groundCheckDistance, groundLayerMask, out hitR);
 
-            Debug.DrawLine(getFeetPos(), getFeetPos() + Vector2.down * groundCheckDistance);
-            Debug.DrawLine(getFeetPos() + Vector2.right * collider_MAIN.size.x / 2, getFeetPos() + Vector2.down + (Vector2.right * collider_MAIN.size.x / 2) * groundCheckDistance);
-            Debug.DrawLine(getFeetPos() - Vector2.right * collider_MAIN.size.x / 2, getFeetPos() + Vector2.down - (Vector2.right * collider_MAIN.size.x / 2) * groundCheckDistance);
+            float ground_dis = groundCheckDistance;
+            if (hasStartedFlip) ground_dis /= 2;
+
+            RaycastHit2D hitC = new RaycastHit2D(), hitL = new RaycastHit2D(), hitR = new RaycastHit2D();
+            bool isG = DetectCollisionAtDistance(getFeetPos() + (Vector2.up / 2), Vector2.down, ground_dis, groundLayerMask, out hitC) ||
+                DetectCollisionAtDistance(getFeetPos() + (Vector2.up / 2) + Vector2.right * collider_MAIN.size.x/2, Vector2.down, ground_dis, groundLayerMask, out hitL) ||
+                DetectCollisionAtDistance(getFeetPos() + (Vector2.up / 2) - Vector2.right * collider_MAIN.size.x/2, Vector2.down, ground_dis, groundLayerMask, out hitR);
+
+            Debug.DrawLine(getFeetPos(), getFeetPos() + Vector2.down * ground_dis);
+            Debug.DrawLine(getFeetPos() + Vector2.right * collider_MAIN.size.x / 2, getFeetPos() + Vector2.down + (Vector2.right * collider_MAIN.size.x / 2) * ground_dis);
+            Debug.DrawLine(getFeetPos() - Vector2.right * collider_MAIN.size.x / 2, getFeetPos() + Vector2.down - (Vector2.right * collider_MAIN.size.x / 2) * ground_dis);
 
             // Check if collision point is within our selected angle range
             if(isG)
@@ -189,7 +197,7 @@ namespace Monado
 
             anim.SetBool("_isGrounded", isG);
             isGrounded = isG;
-            if (isGrounded && (jumpState == JumpState.Falling || jumpState == JumpState.Sliding))
+            if (isGrounded && (jumpState == JumpState.Falling || jumpState == JumpState.Sliding || jumpState == JumpState.Backflip))
             {
                 if (jumpState == JumpState.Sliding) {
                     anim.SetBool("_isSliding", false);
@@ -200,14 +208,13 @@ namespace Monado
                 jumpState = JumpState.Landing;
             } else if(!isGrounded)
             {
-                if (jumpState == JumpState.Sliding/* && input.analogXMovement == wallSlideInitialDirection*/ || (hasStartedFlip && bf_vy > 0)) return;
-                if (jumpState == JumpState.Sliding) {
+                if (jumpState == JumpState.Sliding/* && input.analogXMovement == wallSlideInitialDirection*/) return;
+
                     anim.SetBool("_isSliding", false);
                     isWallSliding = false;
                     OnWallDragEnd();
-                }
-                hasStartedFlip = false;
-                jumpState = JumpState.Falling;
+                              
+                if(jumpState != JumpState.Backflip) jumpState = JumpState.Falling;
             }
         }
         void PushOutFromGeometry()
@@ -234,8 +241,7 @@ namespace Monado
         }
         public Vector3 sidePushSize;
         void WallStuckCheck()
-        {
-            print("tttt");
+        {            
             Collider2D L = Physics2D.OverlapBox(transform.position - (Vector3.right * collider_MAIN.size.x * pushUpDetectionSize),  sidePushSize, 0f, groundLayerMask);
             Collider2D R = Physics2D.OverlapBox(transform.position + (Vector3.right * collider_MAIN.size.x * pushUpDetectionSize),  sidePushSize, 0f, groundLayerMask);
             Debug.Log("L" + L);
@@ -284,19 +290,15 @@ namespace Monado
             angle = Vector2.SignedAngle(Vector2.down, hit.normal);
             angle = angle * Mathf.Deg2Rad;
 
-            // TODO Crawl
-            // If we're crawling, don't flip the sprite around/
-            // If we switch direction, just face the same direction but move in the reverse direction
-
-
-            print(Mathf.Abs(angle));
+            //print(Mathf.Abs(angle));
             if (!isTurning || (isCrouch))
             {
                 if (Mathf.Abs(angle) > 1.65f)
                 {
                     bool isRunning = input.isRunning & !isCrouch;
-                    anim.SetBool("_isRunning", isRunning);
                     if (isRunning && input.xMovement != 0) if (!canSprint()) isRunning = false;
+                    if (!isRunning) ps.ResetStaminaCooldown();
+                    doSprint = isRunning;
                     float speed = (isRunning ? groundRunSpeed : groundMoveSpeed);
                     isOnSlope = (angle != Mathf.PI) && (angle != 0);
                     if (isCrouch) speed = crawlSpeed;
@@ -304,6 +306,7 @@ namespace Monado
                     float _y = Mathf.Sin(angle) * speed * input.xMovement * -1;
                     if(!isTurning) velocity = new Vector2(_x, _y);
 
+                    anim.SetBool("_isRunning", doSprint);
 
                     CheckDirection();
 
@@ -368,60 +371,61 @@ namespace Monado
             else isCrouch = false;
             anim.SetBool("_isCrouch", isCrouch);
 
-            // TODO maybe add some sort of backwards flip jump while crouched
-
             PerformGroundMovement();
         }
-
-        float backJumpTime = 0f;
         public Vector2 backflipStrength = new Vector2(2,3);
         private bool hasStartedFlip = false;
-        private Vector2 flip_init = Vector2.zero;
-        public float initialFlipVelocity = 3f;
-        public Vector2 backflipIV;
-        private float bf_vy;
-        public float backflipGravityScalar = 0.1f;
-        public float backflipAngle = 78;
 
-        float vx0;
-        float vy0;
+        float v_x0;
+        float v_y0;
         float x0;
         float y0;
-        float fliptime = 0f;
-        private Vector2 backFlipTargetPos;
+        float flip_time = 0f;        
+        public Vector2 backflip_velocity;
+        public float backflip_gravity = 5f;
+
 
         void HandleBackJump()
         {
-            CheckGroundedState();
-            if (jumpState != JumpState.Backflip) return;
+            
+            if (jumpState != JumpState.Backflip)
+            {
+                hasStartedFlip = false;
+                return;
+            }
+
             if (!hasStartedFlip)
             {
-                
+                hasStartedFlip = true;
                 isCrouch = false;
-                anim.SetBool("isCrouch", false);
-                anim.SetBool("isGrounded", false);
                 isGrounded = false;
                 isOnSlope = false;
+                anim.SetBool("_isCrouch", isCrouch);
+                anim.SetBool("_isGrounded", isGrounded);
                 StartCoroutine(doJumpCooldown());
                 anim.SetTrigger("_doBackflip");
-                flip_init = new Vector2(transform.position.x, transform.position.y);
-                //flip_vx = backflipStrength.x * direction * -1;
-                //flip_vy0 = backflipStrength.y;
-                backflipIV = new Vector2();
-                hasStartedFlip = true;
-                backJumpTime = 0f;
 
-                backFlipTargetPos = transform.position += (Vector3)backflipStrength;
+                v_x0 = backflipStrength.x * -1 * direction;
+                v_y0 = backflipStrength.y;
+                x0 = rb2d.position.x;
+                y0 = rb2d.position.y;
+                flip_time = 0;
 
-
-                vx0 = backflipStrength.x * direction * -1;
-                vy0 = backflipStrength.y;
-                float x0 = transform.position.x;
-                float y0 = transform.position.y;
-                fliptime = 0f;
+                wallSlideInitialDirection = direction * -1;
+                direction *= -1;
             }
-            
 
+            float _x = x0 + (v_x0 * flip_time);
+            float _vy = v_y0 - (backflip_gravity * flip_time);
+            float _y = y0 + (v_y0 * flip_time) - ((0.5f * backflip_gravity) * (flip_time * flip_time));
+
+            //rb2d.position = new Vector2(_x, _y);
+            backflip_velocity = new Vector2(_x, _y);
+            transform.position = backflip_velocity;
+
+            flip_time += Time.deltaTime;
+
+            CheckGroundedState();
 
             // Vx = Vx0
             // x = x0 +Vx0*t
@@ -493,6 +497,7 @@ namespace Monado
             wasSprintJump = false;
             velocity = Vector2.zero;
             jumpState = JumpState.Grounded;
+            hasStartedFlip = false;
         }
 
         void HandleJumpState()
@@ -603,8 +608,8 @@ namespace Monado
 
             RaycastHit2D hit = new RaycastHit2D();
             if (hitL.collider) hit = hitL; else if (hitR.collider) hit = hitR; else hit = hitC;
-            if (hit && jumpState != JumpState.Falling) {
-               if (hit.collider.tag != "Passable") { jumpState = JumpState.Falling; velocity.y = -0.001f; isWallSliding = false; OnWallDragEnd(); print("foo"); }
+            if (hit && (jumpState != JumpState.Falling && (jumpState != JumpState.Backflip && backflip_velocity.y > 0))) {
+               if (hit.collider.tag != "Passable") { jumpState = JumpState.Falling; velocity.y = -0.001f; isWallSliding = false; OnWallDragEnd(); print("foo2"); }
             }
             return hit.collider;
         }
@@ -612,6 +617,9 @@ namespace Monado
         public void Move()
         {
             // Check if theres a wall next to us
+            float x = velocity.x;
+            if (hasStartedFlip) x = backflip_velocity.x;
+
             int sign = (int)Mathf.Sign(velocity.x);
             if (velocity.x == 0) { sign = (int)Mathf.Sign(previousVelocityX); } else
             {
@@ -625,14 +633,16 @@ namespace Monado
             if (hit && hit.collider.tag != "Passable")
             {
                 velocity.x = 0f;
-                if (jumpState == JumpState.Falling && input.analogXMovement == sign)
+                if ((jumpState == JumpState.Falling && input.analogXMovement == sign))
                 {
                     wallSlideInitialDirection = sign;
+                    hasStartedFlip = false;
                     jumpState = JumpState.Sliding;
                     canJump = true;
                     anim.SetBool("_isSliding", true);
                     isWallSliding = true;
                     OnWallDragStart();
+                    print("Drag");
                 }
             }
             if (jumpState == JumpState.Sliding)
@@ -664,16 +674,6 @@ namespace Monado
 
         public virtual bool canWallJump() { return false; }
         public virtual bool canSprint() { return false; }
-        /////////
-
-        void UpdateHandleBackJump()
-        {
-            fliptime += Time.deltaTime;
-            float _x = x0 + (vx0 * fliptime);
-            float _y = y0 + (vy0 * fliptime) - (0.5f * gravityAcceleration * -1 * Mathf.Pow(fliptime, 2));
-            print(_x + _y);
-            transform.position = new Vector2(transform.position.x + _x, transform.position.y + _y);
-        }
 
         ///////////
 

@@ -10,13 +10,15 @@ namespace Monado
         [Header("Stat Information")]
         public PlayerStatus ps;
         public float run_cost;
-        public float wall_jump_cost;       
+        public float wall_jump_cost;
 
-        public override void OnWallDragStart() {
-            myParticles.wallSlideParticles.Play();            
+        public override void OnWallDragStart()
+        {
+            myParticles.wallSlideParticles.Play();
         }
 
-        public override void OnWallDragEnd() {
+        public override void OnWallDragEnd()
+        {
             myParticles.wallSlideParticles.Stop();
         }
 
@@ -31,36 +33,44 @@ namespace Monado
         {
             GameObject effect = (GameObject)Instantiate(myParticles.wallJumpEffect, pos, Quaternion.FromToRotation(pos, pos + dir));
             Destroy(effect, 0.5f);
+            ps.didChangeLastFrame = true;
+            ps.CancelResetStamina();
+            ps.ResetStaminaCooldown();
         }
 
-        public override void OnTurnStart() {
+        public override void OnTurnStart()
+        {
             Debug.Log(previousVelocityX);
-            if(input.isRunning && isGrounded && Mathf.Abs(previousVelocityX) > 0) myParticles.skidParticles.Play();
+            if (doSprint && isGrounded && Mathf.Abs(previousVelocityX) > 0) myParticles.skidParticles.Play();
         }
-        public override void OnTurnEnd() {
+        public override void OnTurnEnd()
+        {
             myParticles.skidParticles.Stop();
         }
 
         public override void SyncLateUpdate()
         {
-            if (isGrounded && input.isRunning && !myParticles.runParticles.isPlaying && Mathf.Abs(input.xMovement) > groundMoveSpeed && !isCrouch) myParticles.runParticles.Play();
-            else if ((!input.isRunning || !isGrounded || Mathf.Abs(input.xMovement) <= groundMoveSpeed) && myParticles.runParticles.isPlaying) { myParticles.runParticles.Stop(); }
-            if(!isGrounded && myParticles.skidParticles.isPlaying) myParticles.skidParticles.Stop();
+            if (isGrounded && input.isRunning && !myParticles.runParticles.isPlaying && Mathf.Abs(input.xMovement) > groundMoveSpeed && !isCrouch && doSprint) myParticles.runParticles.Play();
+            else if ((!doSprint || !isGrounded || Mathf.Abs(input.xMovement) <= groundMoveSpeed) && myParticles.runParticles.isPlaying) { myParticles.runParticles.Stop(); myParticles.skidParticles.Stop();  }
+            if (!isGrounded && myParticles.skidParticles.isPlaying) myParticles.skidParticles.Stop();
         }
 
-        public override bool canWallJump() {
+        public override bool canWallJump()
+        {
             if (ps.stamina_cooldown) return false;
             float t = ps.stamina - wall_jump_cost;
             ps.stamina = t;
             return true;
         }
 
-        public override bool canSprint() {
+        public override bool canSprint()
+        {
             if (ps.stamina_cooldown) return false;
             float t = ps.stamina - run_cost;
             ps.stamina = t;
+            ps.didChangeLastFrame = true;
+            ps.CancelResetStamina();
             return true;
         }
-
-        }
+    }
 }

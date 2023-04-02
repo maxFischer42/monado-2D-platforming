@@ -18,6 +18,8 @@ public class PlayerStatus : MonoBehaviour
     private bool halt_stamina;
     private float halt_stamina_counter;
     private float halt_stamina_counter_max = 2.5f;
+    public bool didChangeLastFrame = false;
+    public float timeToRegain = 0.6f;
 
     public Image stamina_wheel;
 
@@ -65,10 +67,25 @@ public class PlayerStatus : MonoBehaviour
             if (ratio >= 1) isActive = false;
             stamina_wheel.transform.parent.gameObject.SetActive(isActive);
             stamina_wheel.fillAmount = ratio;
-            if(ratio < 1)
+            if(ratio < 1 && !didChangeLastFrame)
             {
                 stamina += stamina_recovery_amount;
             }
         }
+    }
+
+    public void ResetStaminaCooldown()
+    {
+        Invoke("ResetChange", timeToRegain);
+    }
+    
+    public void CancelResetStamina()
+    {
+        CancelInvoke("ResetChange");
+    }
+
+    void ResetChange()
+    {
+        didChangeLastFrame = false;
     }
 }
